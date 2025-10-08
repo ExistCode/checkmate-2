@@ -1,0 +1,51 @@
+name: Sync main to staging and build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" # optional: runs every hour
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream main
+        run: |
+          git remote add upstream https://github.com/toorcn/checkmate.git
+          git fetch upstream
+          git merge upstream/main --no-edit || true
+
+      - name: Save current commit hash
+        id: save_commit
+        run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        id: build
+        run: |
+          set -e
+          npm run build
+
+      - name: Revert if build fails
+        if: failure()
+        run: |
+          echo "⚠️ Build failed. Reverting to previous commit..."
+          git reset --hard ${{ steps.save_commit.outputs.hash }}
+          git push origin staging --force
+
+      - name: Push updated staging
+        if: success()
+        run: |
+          git push origin staging
