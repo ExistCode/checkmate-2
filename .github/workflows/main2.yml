@@ -1,0 +1,31 @@
+name: Sync upstream main → fork staging
+
+on:
+  workflow_dispatch:       # manual trigger
+  schedule:
+    - cron: "0 * * * *"    # optional: hourly sync
+  # (no push trigger here — so your fork's main doesn't matter)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream repo
+        run: |
+          git remote add upstream https://github.com/toorcn/checkmate.git
+          git fetch upstream
+
+      - name: Rebase staging on upstream/main
+        run: |
+          git rebase upstream/main || true
+
+      - name: Push updated staging
+        run: |
+          git push origin staging --force
