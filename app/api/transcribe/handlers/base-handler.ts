@@ -34,7 +34,7 @@ export interface ExtractedContent {
  * Fact check result interface
  */
 export interface FactCheckResult {
-  verdict: "verified" | "misleading" | "false" | "unverified" | "satire";
+  verdict: "verified" | "misleading" | "false" | "unverified" | "satire" | "partially_true" | "outdated" | "exaggerated" | "opinion" | "rumor" | "conspiracy" | "debunked";
   confidence: number; // 0-100
   explanation: string;
   content: string; // Summary/content of what was fact-checked
@@ -63,6 +63,23 @@ export interface FactCheckResult {
     explanation: string;
     biasIndicators: string[];
     politicalTopics: string[];
+  };
+  // Sentiment analysis from AWS Comprehend
+  sentimentAnalysis?: {
+    overall: string; // POSITIVE, NEGATIVE, NEUTRAL, MIXED
+    scores: {
+      positive: number;
+      negative: number;
+      neutral: number;
+      mixed: number;
+    };
+    keyPhrases: string[];
+    entities?: Array<{
+      text: string;
+      type: string;
+    }>;
+    emotionalIntensity: number; // 0-1 scale
+    flags: string[]; // Warning flags for inflammatory/manipulative content
   };
 }
 
@@ -185,7 +202,11 @@ Task: Read the following analysis text and produce a compact JSON with:
 Guidelines (optimize for rich, comprehensive node coverage without fabrication):
 - Extract AS MANY distinct items as present in the text; do not invent facts.
 - Targets: firstSeenDates up to 15, evolutionSteps up to 10, beliefDrivers up to 10, sources up to 15.
-- For evolutionSteps: Show HOW the belief/claim transformed on each platform, not just platform names. Include the specific adaptation, amplification, or mutation that occurred.
+- For evolutionSteps: For EACH platform, describe the specific transformation that occurred:
+  * transformation: How the content changed (simplified for tweets, emotionalized for TikTok, formatted as memes, etc.)
+  * impact: Quantify reach/engagement when available (went viral, 50K shares, reached mainstream media, etc.) or describe qualitative impact (changed narrative, reached new audience, triggered responses)
+  * Example: {platform: "Twitter", transformation: "Claim simplified to 280 chars, emotional language amplified, misleading context removed", impact: "Went viral with 50K+ retweets, spread to mainstream news"}
+  * Do NOT use generic phrases like "Content spread through X" - always describe what specifically happened
 - For sources: Include both 'title' and 'source' fields where 'source' is the publication/organization name (e.g., "Reuters", "Snopes") and 'title' is the article title.
 - Include dates and URLs whenever available. Prefer diverse platforms (forums, social, influencers, blogs, news, messaging).
 - For beliefDrivers references: Link to practical debunking articles, fact-check explanations, or accessible journalism that explains similar cases - NOT academic papers. Focus on articles that help laypeople understand how misinformation spreads in real-world scenarios.
