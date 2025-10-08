@@ -1,15 +1,13 @@
-name: Sync main to staging and build
+name: Sync upstream main → fork staging
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:       # manual trigger
   schedule:
-    - cron: "0 * * * *" # optional: runs every hour
-  push:
-    branches:
-      - main
+    - cron: "0 * * * *"    # optional: hourly sync
+  # (no push trigger here — so your fork's main doesn't matter)
 
 jobs:
-  sync-and-build:
+  sync:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,33 +17,15 @@ jobs:
           ref: staging
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Add upstream main
+      - name: Add upstream repo
         run: |
           git remote add upstream https://github.com/toorcn/checkmate.git
           git fetch upstream
-          git merge upstream/main --no-edit || true
 
-      - name: Save current commit hash
-        id: save_commit
-        run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        id: build
+      - name: Rebase staging on upstream/main
         run: |
-          set -e
-          npm run build
-
-      - name: Revert if build fails
-        if: failure()
-        run: |
-          echo "⚠️ Build failed. Reverting to previous commit..."
-          git reset --hard ${{ steps.save_commit.outputs.hash }}
-          git push origin staging --force
+          git rebase upstream/main || true
 
       - name: Push updated staging
-        if: success()
         run: |
-          git push origin staging
+          git push origin staging --force
