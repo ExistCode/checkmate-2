@@ -80,7 +80,7 @@ export function UrlInputForm({
     <div className="mx-auto max-w-2xl space-y-5 px-2 sm:px-4">
       <form
         onSubmit={onSubmit}
-        className="flex gap-3 items-center justify-center"
+        className="flex flex-col sm:flex-row gap-3 items-center justify-center"
       >
         <Input
           placeholder={t.urlPlaceholder}

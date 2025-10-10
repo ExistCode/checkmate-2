@@ -39,7 +39,7 @@ export function ActionButtons({
 
   return (
     <div className="pt-4 border-t">
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         {/* Save Button - Only show for authenticated users */}
         {isSignedIn && (
           <Button
