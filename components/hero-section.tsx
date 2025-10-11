@@ -23,10 +23,11 @@ import { parseMarkdownToJSX, sanitizeAssistantText } from "@/lib/analysis/markdo
 interface HeroSectionProps {
   initialUrl?: string;
   variant?: "default" | "dashboard";
+  onAnalysisComplete?: (isComplete: boolean) => void;
 }
 
 
-export function HeroSection({ initialUrl = "", variant = "default" }: HeroSectionProps) {
+export function HeroSection({ initialUrl = "", variant = "default", onAnalysisComplete }: HeroSectionProps) {
   const [url, setUrl] = useState(initialUrl);
   const [chatMode, setChatMode] = useState(false);
   const [forceChat, setForceChat] = useState(false);
@@ -308,6 +309,7 @@ export function HeroSection({ initialUrl = "", variant = "default" }: HeroSectio
     if (result) {
       if (result.success) {
         setIsInputExpanded(false); // Collapse input when results are shown
+        onAnalysisComplete?.(true); // Notify parent that analysis is complete
         // Trigger translation if auto-translation is enabled and language is not English
         if (enableAutoTranslation && language !== "en") {
           // Small delay to allow DOM to update with new content
@@ -319,7 +321,7 @@ export function HeroSection({ initialUrl = "", variant = "default" }: HeroSectio
         toast.error(result.error);
       }
     }
-  }, [result, t, enableAutoTranslation, language, translateCurrentPage]);
+  }, [result, t, enableAutoTranslation, language, translateCurrentPage, onAnalysisComplete]);
 
   const isProbablyUrl = (value: string) => {
     const trimmed = value.trim();
@@ -389,6 +391,7 @@ export function HeroSection({ initialUrl = "", variant = "default" }: HeroSectio
     setIsInputExpanded(true);
     resetProgress();
     reset();
+    onAnalysisComplete?.(false); // Notify parent that analysis is reset
   };
 
   const handleMockAnalysis = async () => {
@@ -692,6 +695,7 @@ This claim appears to have originated from legitimate news sources around early 
     setMockResult(mockData);
     setIsMockLoading(false);
     setIsInputExpanded(false); // Collapse input when mock results are shown
+    onAnalysisComplete?.(true); // Notify parent that analysis is complete
     toast.success("Mock Analysis Complete! (No API costs incurred)");
     
     // Trigger translation if auto-translation is enabled and language is not English
@@ -750,20 +754,49 @@ This claim appears to have originated from legitimate news sources around early 
             }
           : undefined,
         factCheck: dataSource.factCheck
-          ? {
-              verdict: (dataSource.factCheck as any).verdict,
-              confidence: (dataSource.factCheck as any).confidence,
-              explanation: (dataSource.factCheck as any).explanation,
-              content: (dataSource.factCheck as any).content,
-              originTracing: (dataSource.factCheck as any).originTracing,
-              beliefDrivers: (dataSource.factCheck as any).beliefDrivers,
-              sources: (dataSource.factCheck as any).sources?.map((source: any) => ({
-                title: source.title,
-                url: source.url,
-                source: source.title,
-                relevance: source.credibility || source.relevance || 0.5,
-              })),
-            }
+          ? (() => {
+              const fc: any = dataSource.factCheck as any;
+              const merged: any = {
+                verdict: fc.verdict,
+                confidence: fc.confidence,
+                explanation: fc.explanation,
+                content: fc.content,
+                originTracing: fc.originTracing,
+                beliefDrivers: fc.beliefDrivers,
+                sources: fc.sources?.map((source: any) => ({
+                  title: source.title,
+                  url: source.url,
+                  source: source.title,
+                  relevance: source.credibility ?? source.relevance ?? 0.5,
+                })),
+              };
+
+              // Persist political bias analysis when available
+              if (fc.politicalBias) {
+                merged.politicalBias = fc.politicalBias;
+              }
+
+              // Persist additional flags or verification status when present
+              if (fc.isVerified !== undefined) {
+                merged.isVerified = fc.isVerified;
+              }
+              if (fc.flags) {
+                merged.flags = fc.flags;
+              }
+
+              // Support legacy aggregated results
+              if (fc.results) {
+                merged.results = fc.results;
+              }
+
+              // Carry claim/allLinks either from factCheck or from originTracingData fallback
+              const claim = fc.claim ?? (dataSource as any)?.originTracingData?.claim;
+              const allLinks = fc.allLinks ?? (dataSource as any)?.originTracingData?.allLinks;
+              if (claim) merged.claim = claim;
+              if (allLinks) merged.allLinks = allLinks;
+
+              return merged;
+            })()
           : undefined,
         requiresFactCheck: dataSource.requiresFactCheck,
         creatorCredibilityRating:
@@ -939,7 +972,7 @@ This claim appears to have originated from legitimate news sources around early 
               </div>
             )}
           </div>
-          {chatError && <p className="mt-2 text-sm text-red-500">{String(chatError)}</p>}
+          {chatError && <p className="mt-2 text-sm text-destructive">{String(chatError)}</p>}
           {/* Fixed bottom input bar for chat - reuse the same UrlInputForm */}
           <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="mx-auto max-w-3xl px-4 py-3">
